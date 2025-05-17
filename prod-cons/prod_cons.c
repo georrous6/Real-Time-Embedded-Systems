@@ -19,13 +19,17 @@
 #include <stdio.h>
 #include <unistd.h>
 #include <stdlib.h>
+#include <sys/time.h>
+#include <errno.h>
+#include <string.h>
 
 #define QUEUESIZE 10
-#define LOOP 1000
+#define LOOP 10000
 
-int work_num = 0;
-int P = 0;
-int Q = 0;
+int producers_done = 0;
+int P = 0, Q = 0;
+long total_wait_us = 0;
+pthread_mutex_t wait_time_mutex = PTHREAD_MUTEX_INITIALIZER;
 
 void *producer (void *args);
 void *consumer (void *args);
@@ -33,6 +37,7 @@ void *consumer (void *args);
 typedef struct workFunction {
   void * (*work)(void *);
   void * arg;
+  struct timeval timestamp;  // time when producer adds work
 } workFunction;
 
 void *dummy_work(void *arg);
@@ -56,7 +61,7 @@ int main (int argc, char* argv[])
   pthread_t *pro, *con;
 
   if (argc != 4) {
-    fprintf(stderr, "Usage: <P> <Q>\n");
+    fprintf(stderr, "Usage: %s <P> <Q> <output>\n", argv[0]);
     exit(1);
   }
 
@@ -76,85 +81,98 @@ int main (int argc, char* argv[])
     exit (1);
   }
 
-  for (int i = 0; i < P; i++) {
+  for (int i = 0; i < P; i++)
     pthread_create (&pro[i], NULL, producer, fifo);
-  }
 
-  for (int i = 0; i < Q; i++) {
+  for (int i = 0; i < Q; i++)
     pthread_create (&con[i], NULL, consumer, fifo);
-  }
 
-  for (int i = 0; i < P; i++) {
+  for (int i = 0; i < P; i++)
     pthread_join (pro[i], NULL);
-  }
 
-  for (int i = 0; i < Q; i++) {
+  for (int i = 0; i < Q; i++)
     pthread_join (con[i], NULL);
+
+  free (pro);
+  free (con);
+  queueDelete (fifo);
+
+  double average_waiting_time = (double)total_wait_us / (P * LOOP);
+  printf("Average wait time: %.2f us\n", average_waiting_time);
+  FILE* fp = fopen(filename, "a");
+  if (!fp) {
+    fprintf(stderr, "Failed to open \'%s\': %s\n", filename, strerror(errno));
+    exit(1);
   }
 
-  free(pro);
-  free(con);
-
-  queueDelete (fifo);
+  fprintf(fp, "%d %d %lf\n", P, Q, (double)total_wait_us / (P * LOOP));
+  fclose(fp);
 
   return 0;
 }
 
 void *dummy_work (void *arg) {
-    usleep(1000);
+    // usleep(1000);
     return NULL;
 }
 
 void *producer (void *q)
 {
-  queue *fifo;
-  int i;
+  queue *fifo = (queue *)q;
 
-  fifo = (queue *)q;
-
-  for (i = 0; i < LOOP; i++) {
+  for (int i = 0; i < LOOP; i++) {
     pthread_mutex_lock (fifo->mut);
-    while (fifo->full) {
-      printf ("producer: queue FULL.\n");
+    while (fifo->full)
       pthread_cond_wait (fifo->notFull, fifo->mut);
-    }
-    int *work_n = (int *)malloc(sizeof(int)); 
-    if (!work_n) { perror("producer failed to create work"); exit(1); }
-    *work_n = ++work_num;
 
-    workFunction wf = {dummy_work, (void *)work_n};
+    workFunction wf;
+    wf.work = dummy_work;
+    wf.arg = NULL;
+    gettimeofday(&wf.timestamp, NULL);
     queueAdd (fifo, wf);
-    printf("producer created work %d\n", *work_n);
     pthread_mutex_unlock (fifo->mut);
     pthread_cond_signal (fifo->notEmpty);
   }
+
+  pthread_mutex_lock(fifo->mut);
+  producers_done++;
+  pthread_mutex_unlock(fifo->mut);
+  if (producers_done == P)
+      pthread_cond_broadcast(fifo->notEmpty);  // wake up all consumers
 
   return (NULL);
 }
 
 void *consumer (void *q)
 {
-  queue *fifo;
-
-  fifo = (queue *)q;
+  queue *fifo = (queue *)q;
   workFunction wf;
+  struct timeval now;
 
   while (1) {
     pthread_mutex_lock (fifo->mut);
     while (fifo->empty) {
-      printf ("consumer: queue EMPTY.\n");
+      if (producers_done == P) {
+        pthread_mutex_unlock (fifo->mut);
+        return NULL;  // All producers done, exit
+      }
       pthread_cond_wait (fifo->notEmpty, fifo->mut);
     }
     queueDel (fifo, &wf);
     pthread_mutex_unlock (fifo->mut);
     pthread_cond_signal (fifo->notFull);
-    wf.work(wf.arg);
-    printf ("consumer: finished work %d.\n", *((int *)wf.arg));
-    if (*((int *)wf.arg) == LOOP * P) break;
-    free(wf.arg);
-  }
 
-  return (NULL);
+    gettimeofday(&now, NULL);
+
+    long wait_us = (now.tv_sec - wf.timestamp.tv_sec) * 1000000L +
+                    (now.tv_usec - wf.timestamp.tv_usec);
+
+    pthread_mutex_lock(&wait_time_mutex);
+    total_wait_us += wait_us;
+    pthread_mutex_unlock(&wait_time_mutex);
+
+    wf.work(wf.arg);
+  }
 }
 
 queue *queueInit (void)
