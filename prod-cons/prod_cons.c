@@ -24,6 +24,8 @@
 #define LOOP 1000
 
 int work_num = 0;
+int P = 0;
+int Q = 0;
 
 void *producer (void *args);
 void *consumer (void *args);
@@ -58,8 +60,8 @@ int main (int argc, char* argv[])
     exit(1);
   }
 
-  int P = atoi(argv[1]);
-  int Q = atoi(argv[2]);
+  P = atoi(argv[1]);
+  Q = atoi(argv[2]);
 
   pro = malloc(sizeof(pthread_t) * P);
   if (!pro) { perror("Failed to create producers"); exit(1); }
@@ -147,7 +149,7 @@ void *consumer (void *q)
     pthread_cond_signal (fifo->notFull);
     wf.work(wf.arg);
     printf ("consumer: finished work %d.\n", *((int *)wf.arg));
-    if (*(wf.arg) == LOOP * P) break;
+    if (*((int *)wf.arg) == LOOP * P) break;
     free(wf.arg);
   }
 
