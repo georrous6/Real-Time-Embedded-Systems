@@ -11,7 +11,7 @@ do
     for Q in 1 2 4 8
     do
         echo "Running with P=$P, Q=$Q"
-        ./a.out $P $Q
+        ./a.out $P $Q results.txt
     done
 done
 

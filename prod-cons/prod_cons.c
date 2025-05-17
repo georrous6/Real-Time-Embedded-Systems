@@ -55,13 +55,14 @@ int main (int argc, char* argv[])
   queue *fifo;
   pthread_t *pro, *con;
 
-  if (argc != 3) {
+  if (argc != 4) {
     fprintf(stderr, "Usage: <P> <Q>\n");
     exit(1);
   }
 
   P = atoi(argv[1]);
   Q = atoi(argv[2]);
+  const char* filename = argv[3];
 
   pro = malloc(sizeof(pthread_t) * P);
   if (!pro) { perror("Failed to create producers"); exit(1); }
