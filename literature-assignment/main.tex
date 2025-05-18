@@ -4,6 +4,23 @@
 \usepackage{hyperref}
 \usetheme{Madrid}
 
+% Add your name as subtitle for title slide
+\subtitle{Presented by Rousomanis Georgios (10703)}
+
+% Footer customization: your name on bottom left of each slide
+\setbeamertemplate{footline}{
+  \leavevmode%
+  \hbox{%
+    \begin{beamercolorbox}[wd=.5\paperwidth,ht=2.5ex,dp=1ex,left]{author in head/foot}%
+      \hspace{1em}Rousomanis Georgios
+    \end{beamercolorbox}%
+    \begin{beamercolorbox}[wd=.5\paperwidth,ht=2.5ex,dp=1ex,right]{date in head/foot}%
+      \insertframenumber{} / \inserttotalframenumber\hspace{1em}
+    \end{beamercolorbox}%
+  }%
+  \vskip0pt%
+}
+
 \title[CHROMOSOME RTE]{CHROMOSOME: A Plug \& Play-Capable Run-Time Environment for Embedded Real-Time Systems}
 \author{Buckl et al., 2014}
 \institute{fortiss GmbH \& Technische Universität München}
@@ -19,15 +36,23 @@
 % SLIDE 1
 \begin{frame}{Motivation: Why Adaptive Embedded Systems?}
   \begin{itemize}
-    \item Traditional embedded systems rely on static configuration — no updates post-deployment.
+    \item Traditional embedded systems rely on static configuration -- no updates post-deployment.
     \item New-generation systems must support:
     \begin{itemize}
       \item Dynamic integration of new functionality (e.g., OTA updates).
-      \item Fault-tolerant reconfiguration in distributed topologies.
+      \item Adaptation to topology changes (e.g., nodes joining or leaving a network).
     \end{itemize}
-    \item Example: A modern car may have 100+ ECUs with different software life cycles.
+    \item Existing run-time systems (e.g., RTOS):
+    \begin{itemize}
+        \item \textit{Pro}: guaranteed satisfaction of requirements (e.g., real-time behavior, safety)
+        \item \textit{Con}: rely on a static configuration to satisfy requirements
+    \end{itemize}
+    \item Web-service-style middleware (e.g., cloud, enterprise systems)
+    \begin{itemize}
+        \item \textit{Pro}: satisfy adaptability requirements -- very flexible
+        \item \textit{Con}: do not guarantee fulfillment of resource constraints
+    \end{itemize}
     \item Challenge: Combine plug \& play capabilities with hard real-time guarantees.
-    \item Existing middleware lacks the timing predictability required by safety-critical systems.
   \end{itemize}
 \end{frame}
 
@@ -36,7 +61,7 @@
   \begin{itemize}
     \item A modular run-time environment designed for embedded real-time systems.
     \item Built to support plug \& play at both software and network levels.
-    \item Cross-platform and open-source — usable across industrial and automotive domains.
+    \item Cross-platform and open-source -- usable across industrial and automotive domains.
     \item Resource-aware: Uses lookup tables to ensure that added components fit system limits.
     \item Components are dynamically loaded only if sufficient memory, CPU time, and bandwidth exist.
     \item Compatible with both time-triggered and event-driven execution models.
@@ -56,6 +81,20 @@
 \end{frame}
 
 % SLIDE 4
+\begin{frame}{Communication via Topics and Dictionaries}
+  \begin{itemize}
+    \item XME replaces traditional service calls with publish/subscribe over semantic “topics.”
+    \item Each topic includes:
+    \begin{itemize}
+      \item Data type (e.g., sensor\_reading, vehicle\_position).
+      \item Qualifiers: min/max range, units, criticality level, precision.
+    \end{itemize}
+    \item Topic matching ensures syntactic and semantic compatibility between components.
+    \item Enables components developed independently to interoperate safely.
+  \end{itemize}
+\end{frame}
+
+% SLIDE 5
 \begin{frame}{XME Architecture Overview}
   \begin{itemize}
     \item The XME ecosystem is a federation of runtime nodes.
@@ -67,7 +106,15 @@
   \end{itemize}
 \end{frame}
 
-% SLIDE 5
+% SLIDE 6
+\begin{frame}{XME Architecture Overview}
+  \begin{figure}
+      \centering
+      \includegraphics[width=0.6\linewidth]{XME_architecture.png}
+  \end{figure}
+\end{frame}
+
+% SLIDE 7
 \begin{frame}{Play-Phase Components}
   \begin{itemize}
     \item \textbf{Execution Manager (EM)}:
@@ -88,37 +135,6 @@
   \end{itemize}
 \end{frame}
 
-% SLIDE 6
-\begin{frame}{Plug-Phase Components}
-  \begin{itemize}
-    \item \textbf{Login Client/Manager}:
-    \begin{itemize}
-      \item Detects new nodes and establishes secure initial communication.
-    \end{itemize}
-    \item \textbf{Plug \& Play Client/Manager}:
-    \begin{itemize}
-      \item Exchange manifests that describe required topics, timing, safety, etc.
-      \item Validates whether system resources can support the new component.
-      \item Coordinates with Network and Resource Configurators to compute updated tables.
-    \end{itemize}
-    \item Final reconfiguration applied atomically once shadow configuration passes.
-  \end{itemize}
-\end{frame}
-
-% SLIDE 7
-\begin{frame}{Communication via Topics and Dictionaries}
-  \begin{itemize}
-    \item XME replaces traditional service calls with publish/subscribe over semantic “topics.”
-    \item Each topic includes:
-    \begin{itemize}
-      \item Data type (e.g., sensor\_reading, vehicle\_position).
-      \item Qualifiers: min/max range, units, criticality level, precision.
-    \end{itemize}
-    \item Topic matching ensures syntactic and semantic compatibility between components.
-    \item Enables components developed independently to interoperate safely.
-  \end{itemize}
-\end{frame}
-
 % SLIDE 8
 \begin{frame}{Waypoints and Platform Abstraction Layer (PAL)}
   \textbf{Waypoints:}
@@ -135,31 +151,68 @@
 \end{frame}
 
 % SLIDE 9
-\begin{frame}{Tool Support: XMT Modeling Tool}
+\begin{frame}{Plug-Phase: Dynamic Integration in XME}
   \begin{itemize}
-    \item Eclipse-based graphical environment for designing XME systems.
-    \item Developers can:
+    \item \textbf{Login Phase:}
     \begin{itemize}
-      \item Declare component behavior, topics, and constraints.
-      \item Validate system resource allocations and check for timing violations.
-      \item Generate code and configuration files for deployment.
+      \item New node’s \textit{Login Client} contacts a central \textit{Login Manager}.
+      \item Enables access to XME services.
     \end{itemize}
-    \item Supports both static and dynamic configuration workflows.
+
+    \item \textbf{Component Discovery:}
+    \begin{itemize}
+      \item \textit{Plug \& Play Client} sends \textit{manifests} to the \textit{Plug \& Play Manager}.
+      \item Describes topics, resource needs, and constraints.
+    \end{itemize}
+
+    \item \textbf{Validation:}
+    \begin{itemize}
+      \item \textit{Logical Route Manager} computes routes.
+      \item Configurators check network and node resource availability.
+    \end{itemize}
+
+    \item \textbf{Decision:}
+    \begin{itemize}
+      \item If checks pass: update lookup tables and apply new config.
+      \item Else: reject change to maintain safety and real-time guarantees.
+    \end{itemize}
   \end{itemize}
 \end{frame}
 
 % SLIDE 10
+\begin{frame}{CHROMOSOME Modeling Tool (XMT)}
+  \textbf{Purpose:} Support the design, validation, and configuration of distributed embedded systems.
+
+  \vspace{0.7em}
+  \begin{itemize}
+    \item \textbf{Model-driven design tool}, built on Eclipse.
+    \item Defines an iterative workflow:
+    \begin{itemize}
+      \item Specification → Implementation → Evolution
+    \end{itemize}
+    \item Allows developers to:
+    \begin{itemize}
+      \item Declare requirements (timing, safety, communication patterns).
+      \item Model the XME ecosystem structure and topic dictionaries.
+      \item Validate the system early to catch design issues.
+      \item Auto-generate RTE configurations (adaptive or static).
+    \end{itemize}
+    \item \textbf{Static mode:} Generates an offline configuration with zero run-time overhead.
+  \end{itemize}
+\end{frame}
+
+% SLIDE 11
 \begin{frame}{Use Case 1: RACE (Automotive)}
   \begin{itemize}
     \item Objective: enable adaptive automotive architecture with hard real-time support.
-    \item Deployed using PikeOS partitions — each app runs in a secure container.
+    \item Deployed using PikeOS partitions -- each app runs in a secure container.
     \item XME runs in a master partition; manages partition communication and coordination.
     \item Real-time scheduling configured based on WCET data and component criticality.
     \item Allows runtime replacement of software modules without rebooting the ECU.
   \end{itemize}
 \end{frame}
 
-% SLIDE 11
+% SLIDE 12
 \begin{frame}{Use Case 2: AutoPnP (Industrial Automation)}
   \begin{itemize}
     \item Targeted for factories needing reconfiguration without halting production.
@@ -170,7 +223,7 @@
   \end{itemize}
 \end{frame}
 
-% SLIDE 12
+% SLIDE 13
 \begin{frame}{Comparison with Other Frameworks}
   \begin{tabular}{l|l|l}
     \textbf{System} & \textbf{Real-Time Support} & \textbf{Adaptivity} \\
@@ -185,7 +238,7 @@
   XME uniquely blends static real-time safety with dynamic reconfigurability.
 \end{frame}
 
-% SLIDE 13
+% SLIDE 14
 \begin{frame}{Future Directions}
   \begin{itemize}
     \item Full end-to-end timing analysis across multi-node ecosystems.
@@ -195,17 +248,17 @@
   \end{itemize}
 \end{frame}
 
-% SLIDE 14
+% SLIDE 15
 \begin{frame}{Conclusion}
   \begin{itemize}
     \item XME enables real-time embedded systems to adapt safely and modularly.
     \item Combines model-driven design, static analysis, and runtime orchestration.
     \item Plug \& play becomes practical for cyber-physical systems (CPS).
-    \item Publicly available — suitable for research and industrial applications.
+    \item Publicly available -- suitable for research and industrial applications.
   \end{itemize}
 \end{frame}
 
-% SLIDE 15
+% SLIDE 16
 \begin{frame}{Thank You!}
   \centering
   \Huge Questions?
